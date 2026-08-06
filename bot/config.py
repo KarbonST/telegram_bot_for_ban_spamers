@@ -11,6 +11,6 @@ class Config:
 
 
 config = Config(
-    telegram_token=os.getenv("TELEGRAM_TOKEN"),
+    telegram_token=os.getenv("TG_BOT_TOKEN"),
     gemini_api_key=os.getenv("GEMINI_API_KEY"),
 )
