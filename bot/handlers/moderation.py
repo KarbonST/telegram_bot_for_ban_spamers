@@ -8,7 +8,7 @@ from bot.services.verification import ensure_verification
 moderation_router = Router()
 logger = logging.getLogger(__name__)
 FIRST_MESSAGE_VERIFICATION_TEXT = (
-    "Мы удалили ваше первое сообщение до проверки. "
+    "Для защиты чата нужно пройти быструю проверку. "
     "Подтвердите, что вы не бот, в течение 30 секунд."
 )
 
@@ -32,7 +32,7 @@ async def moderation_handler(message: Message) -> None:
         text_preview(message.text or message.caption),
     )
 
-    should_block_user = await ensure_verification(
+    verification_started = await ensure_verification(
         bot=message.bot,
         chat_id=message.chat.id,
         user_id=message.from_user.id,
@@ -41,11 +41,10 @@ async def moderation_handler(message: Message) -> None:
         verification_text=FIRST_MESSAGE_VERIFICATION_TEXT,
     )
 
-    if should_block_user:
-        logger.warning(
-            "Deleted message from unverified user %s %s message_id=%s",
+    if verification_started:
+        logger.info(
+            "Verification started after first message %s %s message_id=%s",
             chat_repr(message.chat),
             user_repr(message.from_user),
             message.message_id,
         )
-        await message.delete()
