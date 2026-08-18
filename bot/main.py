@@ -1,12 +1,21 @@
 import asyncio
 from aiogram import Bot, Dispatcher
-from config import config
-from handlers.start import start_router
+
+from bot.config import config
+from bot.database.session import init_db
+from bot.handlers.moderation import moderation_router
+from bot.handlers.start import start_router
+from bot.handlers.verification import verification_router
 
 async def main() -> None:
+    await init_db()
+
     bot = Bot(token=config.telegram_token)
     dp = Dispatcher()
+
     dp.include_router(start_router)
+    dp.include_router(verification_router)
+    dp.include_router(moderation_router)
 
     await dp.start_polling(bot)
 
