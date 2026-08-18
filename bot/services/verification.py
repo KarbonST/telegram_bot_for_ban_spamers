@@ -6,14 +6,12 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.types import ChatPermissions
 
+from bot.config import config
 from bot.database.users.repository import (
     get_or_create_user,
     mark_user_verified,
 )
 from bot.keyboards.verification_keyboard import verification_keyboard
-
-
-VERIFICATION_TIMEOUT_SECONDS = 30
 
 
 @dataclass(slots=True)
@@ -106,7 +104,7 @@ async def confirm_verification(bot: Bot, chat_id: int, user_id: int) -> bool:
 
 async def _expire_verification(bot: Bot, chat_id: int, user_id: int) -> None:
     try:
-        await asyncio.sleep(VERIFICATION_TIMEOUT_SECONDS)
+        await asyncio.sleep(config.VERIFICATION_TIMEOUT_SECONDS)
     except asyncio.CancelledError:
         return
 
