@@ -40,9 +40,7 @@ async def main() -> None:
     dp.include_router(access_router)
     dp.include_router(verification_router)
     dp.include_router(moderation_router)
-    logger.info("Enabled routers: start, access, verification")
-
-    logger.info("Message moderation router is disabled")
+    logger.info("Enabled routers: start, access, verification, moderation")
 
     await dp.start_polling(bot)
 

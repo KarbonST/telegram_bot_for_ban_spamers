@@ -7,6 +7,10 @@ from bot.services.verification import confirm_verification, ensure_verification
 
 verification_router = Router()
 logger = logging.getLogger(__name__)
+JOIN_VERIFICATION_TEXT = (
+    "Добро пожаловать! Подтвердите, что вы не бот, "
+    "в течение 30 секунд."
+)
 
 
 @verification_router.message(F.new_chat_members)
@@ -28,6 +32,8 @@ async def verify_new_chat_members(message: Message) -> None:
             bot=message.bot,
             chat_id=message.chat.id,
             user_id=new_member.id,
+            source="join",
+            verification_text=JOIN_VERIFICATION_TEXT,
         )
 
 

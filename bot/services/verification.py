@@ -34,6 +34,10 @@ async def ensure_verification(
     chat_id: int,
     user_id: int,
     message_id: int | None = None,
+    source: str = "unknown",
+    verification_text: str = (
+        "Подтвердите, что вы не бот, в течение 30 секунд."
+    ),
 ) -> bool:
     key = (chat_id, user_id)
     lock = _get_lock(key)
@@ -53,9 +57,10 @@ async def ensure_verification(
 
         if state is None:
             logger.info(
-                "Starting verification chat_id=%s user_id=%s timeout=%s",
+                "Starting verification chat_id=%s user_id=%s source=%s timeout=%s",
                 chat_id,
                 user_id,
+                source,
                 config.verification_timeout_seconds,
             )
             await bot.restrict_chat_member(
@@ -66,7 +71,7 @@ async def ensure_verification(
 
             verification_message = await bot.send_message(
                 chat_id=chat_id,
-                text="Это ваше первое сообщение. Подтвердите, что вы не бот, в течение 30 секунд.",
+                text=verification_text,
                 reply_markup=verification_keyboard(user_id),
             )
 
@@ -77,16 +82,18 @@ async def ensure_verification(
                 name=f"verification:{chat_id}:{user_id}",
             )
             logger.info(
-                "Verification message sent chat_id=%s user_id=%s verify_message_id=%s",
+                "Verification message sent chat_id=%s user_id=%s source=%s verify_message_id=%s",
                 chat_id,
                 user_id,
+                source,
                 verification_message.message_id,
             )
         else:
             logger.info(
-                "Verification already pending chat_id=%s user_id=%s verify_message_id=%s tracked_messages=%s",
+                "Verification already pending chat_id=%s user_id=%s source=%s verify_message_id=%s tracked_messages=%s",
                 chat_id,
                 user_id,
+                source,
                 state.verify_message_id,
                 len(state.message_ids),
             )
@@ -94,9 +101,10 @@ async def ensure_verification(
         if message_id is not None:
             state.message_ids.add(message_id)
             logger.info(
-                "Tracked message for pending verification chat_id=%s user_id=%s message_id=%s tracked_messages=%s",
+                "Tracked message for pending verification chat_id=%s user_id=%s source=%s message_id=%s tracked_messages=%s",
                 chat_id,
                 user_id,
+                source,
                 message_id,
                 len(state.message_ids),
             )

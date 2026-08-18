@@ -7,6 +7,10 @@ from bot.services.verification import ensure_verification
 
 moderation_router = Router()
 logger = logging.getLogger(__name__)
+FIRST_MESSAGE_VERIFICATION_TEXT = (
+    "Мы удалили ваше первое сообщение до проверки. "
+    "Подтвердите, что вы не бот, в течение 30 секунд."
+)
 
 
 @moderation_router.message()
@@ -33,6 +37,8 @@ async def moderation_handler(message: Message) -> None:
         chat_id=message.chat.id,
         user_id=message.from_user.id,
         message_id=message.message_id,
+        source="first_message",
+        verification_text=FIRST_MESSAGE_VERIFICATION_TEXT,
     )
 
     if should_block_user:
