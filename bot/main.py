@@ -15,7 +15,8 @@ async def main() -> None:
 
     dp.include_router(start_router)
     dp.include_router(verification_router)
-    dp.include_router(moderation_router)
+
+    #dp.include_router(moderation_router)
 
     await dp.start_polling(bot)
 
