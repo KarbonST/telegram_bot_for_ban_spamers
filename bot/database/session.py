@@ -9,7 +9,7 @@ from bot.database.users.users import User
 
 engine = create_async_engine(
     "sqlite+aiosqlite:///bot.db",
-    echo=True,
+    echo=False,
 )
 
 

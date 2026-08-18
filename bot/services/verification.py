@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from contextlib import suppress
 from dataclasses import dataclass, field
 
@@ -12,6 +13,9 @@ from bot.database.users.repository import (
     mark_user_verified,
 )
 from bot.keyboards.verification_keyboard import verification_keyboard
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -38,11 +42,22 @@ async def ensure_verification(
         user = await get_or_create_user(chat_id, user_id)
 
         if user.is_verified:
+            logger.info(
+                "Skip verification for verified user chat_id=%s user_id=%s",
+                chat_id,
+                user_id,
+            )
             return False
 
         state = pending_verifications.get(key)
 
         if state is None:
+            logger.info(
+                "Starting verification chat_id=%s user_id=%s timeout=%s",
+                chat_id,
+                user_id,
+                config.verification_timeout_seconds,
+            )
             await bot.restrict_chat_member(
                 chat_id=chat_id,
                 user_id=user_id,
@@ -61,9 +76,30 @@ async def ensure_verification(
                 _expire_verification(bot, chat_id, user_id),
                 name=f"verification:{chat_id}:{user_id}",
             )
+            logger.info(
+                "Verification message sent chat_id=%s user_id=%s verify_message_id=%s",
+                chat_id,
+                user_id,
+                verification_message.message_id,
+            )
+        else:
+            logger.info(
+                "Verification already pending chat_id=%s user_id=%s verify_message_id=%s tracked_messages=%s",
+                chat_id,
+                user_id,
+                state.verify_message_id,
+                len(state.message_ids),
+            )
 
         if message_id is not None:
             state.message_ids.add(message_id)
+            logger.info(
+                "Tracked message for pending verification chat_id=%s user_id=%s message_id=%s tracked_messages=%s",
+                chat_id,
+                user_id,
+                message_id,
+                len(state.message_ids),
+            )
 
         return True
 
@@ -76,35 +112,66 @@ async def confirm_verification(bot: Bot, chat_id: int, user_id: int) -> bool:
         state = pending_verifications.pop(key, None)
 
         if state is None:
+            logger.info(
+                "Verification confirm skipped because no pending state chat_id=%s user_id=%s",
+                chat_id,
+                user_id,
+            )
             return False
 
         user = await get_or_create_user(chat_id, user_id)
 
         if user.is_verified:
+            logger.info(
+                "Verification confirm skipped because user already verified chat_id=%s user_id=%s",
+                chat_id,
+                user_id,
+            )
             return False
 
         if state.task:
             state.task.cancel()
             with suppress(asyncio.CancelledError):
                 await state.task
+            logger.info(
+                "Verification timeout task cancelled chat_id=%s user_id=%s",
+                chat_id,
+                user_id,
+            )
 
         await mark_user_verified(chat_id, user_id)
+        logger.info(
+            "User marked as verified chat_id=%s user_id=%s",
+            chat_id,
+            user_id,
+        )
 
         await bot.restrict_chat_member(
             chat_id=chat_id,
             user_id=user_id,
             permissions=await _allowed_permissions(bot, chat_id),
         )
+        logger.info(
+            "Chat permissions restored for verified user chat_id=%s user_id=%s",
+            chat_id,
+            user_id,
+        )
 
         with suppress(TelegramBadRequest, TelegramForbiddenError):
             await bot.delete_message(chat_id, state.verify_message_id)
+            logger.info(
+                "Verification message deleted chat_id=%s user_id=%s verify_message_id=%s",
+                chat_id,
+                user_id,
+                state.verify_message_id,
+            )
 
         return True
 
 
 async def _expire_verification(bot: Bot, chat_id: int, user_id: int) -> None:
     try:
-        await asyncio.sleep(config.VERIFICATION_TIMEOUT_SECONDS)
+        await asyncio.sleep(config.verification_timeout_seconds)
     except asyncio.CancelledError:
         return
 
@@ -117,17 +184,41 @@ async def _expire_verification(bot: Bot, chat_id: int, user_id: int) -> None:
         if state is None:
             return
 
+        logger.warning(
+            "Verification expired chat_id=%s user_id=%s tracked_messages=%s",
+            chat_id,
+            user_id,
+            len(state.message_ids),
+        )
+
         with suppress(TelegramBadRequest, TelegramForbiddenError):
             await bot.delete_message(chat_id, state.verify_message_id)
+            logger.info(
+                "Expired verification message deleted chat_id=%s user_id=%s verify_message_id=%s",
+                chat_id,
+                user_id,
+                state.verify_message_id,
+            )
 
         for tracked_message_id in state.message_ids:
             with suppress(TelegramBadRequest, TelegramForbiddenError):
                 await bot.delete_message(chat_id, tracked_message_id)
+                logger.info(
+                    "Tracked message deleted after verification timeout chat_id=%s user_id=%s message_id=%s",
+                    chat_id,
+                    user_id,
+                    tracked_message_id,
+                )
 
         await bot.ban_chat_member(
             chat_id=chat_id,
             user_id=user_id,
             revoke_messages=True,
+        )
+        logger.warning(
+            "User banned after verification timeout chat_id=%s user_id=%s",
+            chat_id,
+            user_id,
         )
 
 
