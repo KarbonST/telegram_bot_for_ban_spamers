@@ -4,6 +4,7 @@ from contextlib import suppress
 from dataclasses import dataclass, field
 
 from aiogram import Bot
+from aiogram.enums import ChatMemberStatus
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.types import ChatPermissions
 
@@ -43,6 +44,9 @@ async def ensure_verification(
     lock = _get_lock(key)
 
     async with lock:
+        if await _is_verification_exempt_member(bot, chat_id, user_id, source):
+            return False
+
         user = await get_or_create_user(chat_id, user_id)
 
         if user.is_verified:
@@ -63,11 +67,23 @@ async def ensure_verification(
                 source,
                 config.verification_timeout_seconds,
             )
-            await bot.restrict_chat_member(
-                chat_id=chat_id,
-                user_id=user_id,
-                permissions=_restricted_permissions(),
-            )
+            try:
+                await bot.restrict_chat_member(
+                    chat_id=chat_id,
+                    user_id=user_id,
+                    permissions=_restricted_permissions(),
+                )
+            except TelegramBadRequest as error:
+                if _is_admin_bad_request(error):
+                    logger.info(
+                        "Skip verification because user cannot be restricted as admin "
+                        "chat_id=%s user_id=%s source=%s",
+                        chat_id,
+                        user_id,
+                        source,
+                    )
+                    return False
+                raise
 
             verification_message = await bot.send_message(
                 chat_id=chat_id,
@@ -154,16 +170,27 @@ async def confirm_verification(bot: Bot, chat_id: int, user_id: int) -> bool:
             user_id,
         )
 
-        await bot.restrict_chat_member(
-            chat_id=chat_id,
-            user_id=user_id,
-            permissions=await _allowed_permissions(bot, chat_id),
-        )
-        logger.info(
-            "Chat permissions restored for verified user chat_id=%s user_id=%s",
-            chat_id,
-            user_id,
-        )
+        try:
+            await bot.restrict_chat_member(
+                chat_id=chat_id,
+                user_id=user_id,
+                permissions=await _allowed_permissions(bot, chat_id),
+            )
+            logger.info(
+                "Chat permissions restored for verified user chat_id=%s user_id=%s",
+                chat_id,
+                user_id,
+            )
+        except TelegramBadRequest as error:
+            if _is_admin_bad_request(error):
+                logger.info(
+                    "Skip restoring permissions because user is admin "
+                    "chat_id=%s user_id=%s",
+                    chat_id,
+                    user_id,
+                )
+            else:
+                raise
 
         with suppress(TelegramBadRequest, TelegramForbiddenError):
             await bot.delete_message(chat_id, state.verify_message_id)
@@ -218,16 +245,27 @@ async def _expire_verification(bot: Bot, chat_id: int, user_id: int) -> None:
                     tracked_message_id,
                 )
 
-        await bot.ban_chat_member(
-            chat_id=chat_id,
-            user_id=user_id,
-            revoke_messages=True,
-        )
-        logger.warning(
-            "User banned after verification timeout chat_id=%s user_id=%s",
-            chat_id,
-            user_id,
-        )
+        try:
+            await bot.ban_chat_member(
+                chat_id=chat_id,
+                user_id=user_id,
+                revoke_messages=True,
+            )
+            logger.warning(
+                "User banned after verification timeout chat_id=%s user_id=%s",
+                chat_id,
+                user_id,
+            )
+        except TelegramBadRequest as error:
+            if _is_admin_bad_request(error):
+                logger.info(
+                    "Skip ban after verification timeout because user is admin "
+                    "chat_id=%s user_id=%s",
+                    chat_id,
+                    user_id,
+                )
+            else:
+                raise
 
 
 def _restricted_permissions() -> ChatPermissions:
@@ -282,3 +320,31 @@ def _get_lock(key: tuple[int, int]) -> asyncio.Lock:
 
 def is_verification_pending(chat_id: int, user_id: int) -> bool:
     return (chat_id, user_id) in pending_verifications
+
+
+async def _is_verification_exempt_member(
+    bot: Bot,
+    chat_id: int,
+    user_id: int,
+    source: str,
+) -> bool:
+    member = await bot.get_chat_member(chat_id, user_id)
+
+    if member.status not in {
+        ChatMemberStatus.ADMINISTRATOR,
+        ChatMemberStatus.CREATOR,
+    }:
+        return False
+
+    logger.info(
+        "Skip verification for privileged member chat_id=%s user_id=%s status=%s source=%s",
+        chat_id,
+        user_id,
+        member.status,
+        source,
+    )
+    return True
+
+
+def _is_admin_bad_request(error: TelegramBadRequest) -> bool:
+    return "administrator of the chat" in str(error).lower()
