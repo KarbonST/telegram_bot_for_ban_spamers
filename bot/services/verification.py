@@ -336,6 +336,18 @@ async def _is_verification_exempt_member(
     }:
         return False
 
+    user = await get_or_create_user(chat_id, user_id)
+
+    if not user.is_verified:
+        await mark_user_verified(chat_id, user_id)
+        logger.info(
+            "Privileged member auto-verified chat_id=%s user_id=%s status=%s source=%s",
+            chat_id,
+            user_id,
+            member.status,
+            source,
+        )
+
     logger.info(
         "Skip verification for privileged member chat_id=%s user_id=%s status=%s source=%s",
         chat_id,
