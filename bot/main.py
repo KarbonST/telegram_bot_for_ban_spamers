@@ -8,6 +8,7 @@ from bot.handlers.moderation import moderation_router
 from bot.handlers.access import access_router
 from bot.handlers.start import start_router
 from bot.handlers.verification import verification_router
+from bot.middlewares.message_audit import MessageAuditMiddleware
 
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,8 @@ async def main() -> None:
 
     bot = Bot(token=config.telegram_token)
     dp = Dispatcher()
+    dp.message.outer_middleware(MessageAuditMiddleware())
+    logger.info("Enabled middlewares: message_audit")
 
     dp.include_router(start_router)
     dp.include_router(access_router)

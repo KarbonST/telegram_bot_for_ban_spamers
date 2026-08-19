@@ -278,3 +278,7 @@ def _get_lock(key: tuple[int, int]) -> asyncio.Lock:
         verification_locks[key] = lock
 
     return lock
+
+
+def is_verification_pending(chat_id: int, user_id: int) -> bool:
+    return (chat_id, user_id) in pending_verifications
