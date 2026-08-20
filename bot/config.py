@@ -24,6 +24,7 @@ class Config:
     telegram_token: str
     allowed_chat_id: int | None
     verification_timeout_seconds: int
+    join_verification_enabled: bool
     first_message_verification_enabled: bool
     gemini_spam_moderation_enabled: bool
     gemini_api_key: str | None
@@ -55,6 +56,10 @@ config = Config(
     verification_timeout_seconds=_to_int(
         os.getenv("VERIFICATION_TIMEOUT_SECONDS"),
         default=30,
+    ),
+    join_verification_enabled=_to_bool(
+        os.getenv("JOIN_VERIFICATION_ENABLED"),
+        default=True,
     ),
     first_message_verification_enabled=_to_bool(
         os.getenv("FIRST_MESSAGE_VERIFICATION_ENABLED"),

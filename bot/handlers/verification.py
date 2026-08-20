@@ -2,6 +2,7 @@ import logging
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
 
+from bot.config import config
 from bot.logging_utils import chat_repr, user_repr
 from bot.services.verification import confirm_verification, ensure_verification
 
@@ -16,6 +17,14 @@ JOIN_VERIFICATION_TEXT = (
 @verification_router.message(F.new_chat_members)
 async def verify_new_chat_members(message: Message) -> None:
     if message.chat.type not in {"group", "supergroup"}:
+        return
+
+    if not config.join_verification_enabled:
+        logger.info(
+            "Skipping join verification by config %s new_chat_members=%s",
+            chat_repr(message.chat),
+            [user_repr(member) for member in message.new_chat_members or []],
+        )
         return
 
     for new_member in message.new_chat_members or []:
