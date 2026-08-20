@@ -11,6 +11,7 @@ from aiogram.types import ChatPermissions
 from bot.config import config
 from bot.database.users.repository import (
     get_or_create_user,
+    mark_user_unverified,
     mark_user_verified,
 )
 from bot.keyboards.verification_keyboard import verification_keyboard
@@ -44,7 +45,7 @@ async def ensure_verification(
     lock = _get_lock(key)
 
     async with lock:
-        if await _is_verification_exempt_member(bot, chat_id, user_id, source):
+        if await ensure_privileged_member_verified(bot, chat_id, user_id, source):
             return False
 
         user = await get_or_create_user(chat_id, user_id)
@@ -322,7 +323,7 @@ def is_verification_pending(chat_id: int, user_id: int) -> bool:
     return (chat_id, user_id) in pending_verifications
 
 
-async def _is_verification_exempt_member(
+async def ensure_privileged_member_verified(
     bot: Bot,
     chat_id: int,
     user_id: int,
@@ -360,3 +361,50 @@ async def _is_verification_exempt_member(
 
 def _is_admin_bad_request(error: TelegramBadRequest) -> bool:
     return "administrator of the chat" in str(error).lower()
+
+
+async def cancel_pending_verification(
+    bot: Bot,
+    chat_id: int,
+    user_id: int,
+    reason: str,
+) -> bool:
+    key = (chat_id, user_id)
+    lock = _get_lock(key)
+
+    async with lock:
+        state = pending_verifications.pop(key, None)
+
+        if state is None:
+            return False
+
+        if state.task:
+            state.task.cancel()
+            with suppress(asyncio.CancelledError):
+                await state.task
+
+        with suppress(TelegramBadRequest, TelegramForbiddenError):
+            await bot.delete_message(chat_id, state.verify_message_id)
+
+        logger.info(
+            "Pending verification cancelled chat_id=%s user_id=%s reason=%s",
+            chat_id,
+            user_id,
+            reason,
+        )
+        return True
+
+
+async def reset_verified_status(chat_id: int, user_id: int, reason: str) -> bool:
+    user = await mark_user_unverified(chat_id, user_id)
+
+    if user is None:
+        return False
+
+    logger.info(
+        "User verification reset chat_id=%s user_id=%s reason=%s",
+        chat_id,
+        user_id,
+        reason,
+    )
+    return True

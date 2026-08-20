@@ -2,7 +2,9 @@ import logging
 from aiogram import Router, F
 from aiogram.types import Message
 
+from bot.config import config
 from bot.logging_utils import chat_repr, text_preview, user_repr
+from bot.services.spam_moderation import moderate_message_for_spam
 from bot.services.verification import ensure_verification
 
 moderation_router = Router()
@@ -48,6 +50,38 @@ async def moderation_handler(message: Message) -> None:
         message.message_id,
         text_preview(message.text or message.caption),
     )
+
+    if config.gemini_spam_moderation_enabled:
+        spam_result = await moderate_message_for_spam(message)
+
+        if spam_result.action != "allow":
+            logger.info(
+                "Message processing stopped after spam moderation %s %s message_id=%s action=%s score=%s",
+                chat_repr(message.chat),
+                user_repr(message.from_user),
+                message.message_id,
+                spam_result.action,
+                spam_result.score,
+            )
+            return
+    else:
+        logger.info(
+            "Skipping Gemini spam moderation by config %s %s message_id=%s mode=%s",
+            chat_repr(message.chat),
+            user_repr(message.from_user),
+            message.message_id,
+            config.message_moderation_mode,
+        )
+
+    if not config.first_message_verification_enabled:
+        logger.info(
+            "Skipping first-message verification by config %s %s message_id=%s mode=%s",
+            chat_repr(message.chat),
+            user_repr(message.from_user),
+            message.message_id,
+            config.message_moderation_mode,
+        )
+        return
 
     verification_started = await ensure_verification(
         bot=message.bot,

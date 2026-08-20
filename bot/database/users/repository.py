@@ -85,3 +85,25 @@ async def mark_user_verified(
         await session.refresh(user)
 
         return user
+
+
+async def mark_user_unverified(
+        chat_id: int,
+        telegram_id: int,
+) -> User | None:
+    async with async_session() as session:
+        result = await session.execute(
+            select(User)
+            .where(User.chat_id == chat_id,
+                   User.telegram_id == telegram_id)
+        )
+        user = result.scalar_one_or_none()
+
+        if user is None:
+            return None
+
+        user.is_verified = False
+        await session.commit()
+        await session.refresh(user)
+
+        return user
