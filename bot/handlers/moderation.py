@@ -51,7 +51,7 @@ async def moderation_handler(message: Message) -> None:
         text_preview(message.text or message.caption),
     )
 
-    if config.gemini_spam_moderation_enabled:
+    if config.gigachat_spam_moderation_enabled:
         spam_result = await moderate_message_for_spam(message)
 
         if spam_result.action != "allow":
@@ -66,7 +66,7 @@ async def moderation_handler(message: Message) -> None:
             return
     else:
         logger.info(
-            "Skipping Gemini spam moderation by config %s %s message_id=%s mode=%s",
+            "Skipping GigaChat spam moderation by config %s %s message_id=%s mode=%s",
             chat_repr(message.chat),
             user_repr(message.from_user),
             message.message_id,

@@ -7,7 +7,7 @@ from aiogram.types import Message
 from bot.config import config
 from bot.database.users.repository import get_user
 from bot.logging_utils import chat_repr, text_preview, user_repr
-from bot.services.gemini_moderation import classify_message_with_gemini
+from bot.services.gigachat_moderation import classify_message_with_gigachat
 from bot.services.spam_scoring import score_message_text
 from bot.services.verification import (
     cancel_pending_verification,
@@ -24,9 +24,9 @@ class SpamModerationResult:
     action: str = "allow"
     score: int = 0
     matched_rules: list[str] = field(default_factory=list)
-    gemini_checked: bool = False
-    gemini_verdict: str | None = None
-    gemini_reason: str | None = None
+    ai_checked: bool = False
+    ai_verdict: str | None = None
+    ai_reason: str | None = None
 
 
 async def moderate_message_for_spam(message: Message) -> SpamModerationResult:
@@ -77,7 +77,7 @@ async def moderate_message_for_spam(message: Message) -> SpamModerationResult:
             matched_rules=score_result.matched_rules,
         )
 
-    gemini_result = await classify_message_with_gemini(
+    gigachat_result = await classify_message_with_gigachat(
         text=text,
         content_type=content_type,
         is_verified=is_verified,
@@ -85,15 +85,15 @@ async def moderate_message_for_spam(message: Message) -> SpamModerationResult:
         matched_rules=score_result.matched_rules,
     )
 
-    if not gemini_result.checked:
+    if not gigachat_result.checked:
         logger.warning(
-            "Gemini spam moderation skipped %s %s message_id=%s score=%s matched_rules=%s skipped_reason=%s",
+            "GigaChat spam moderation skipped %s %s message_id=%s score=%s matched_rules=%s skipped_reason=%s",
             chat_repr(message.chat),
             user_repr(message.from_user),
             message.message_id,
             score_result.score,
             score_result.matched_rules or ["<none>"],
-            gemini_result.skipped_reason,
+            gigachat_result.skipped_reason,
         )
         return SpamModerationResult(
             score=score_result.score,
@@ -101,38 +101,42 @@ async def moderate_message_for_spam(message: Message) -> SpamModerationResult:
         )
 
     logger.info(
-        "Gemini spam moderation completed %s %s message_id=%s score=%s verdict=%s reason=%r",
+        "GigaChat spam moderation completed %s %s message_id=%s score=%s verdict=%s "
+        "reason=%r prompt_tokens=%s completion_tokens=%s total_tokens=%s",
         chat_repr(message.chat),
         user_repr(message.from_user),
         message.message_id,
         score_result.score,
-        gemini_result.verdict,
-        gemini_result.reason,
+        gigachat_result.verdict,
+        gigachat_result.reason,
+        gigachat_result.prompt_tokens,
+        gigachat_result.completion_tokens,
+        gigachat_result.total_tokens,
     )
 
-    if gemini_result.verdict != "spam":
+    if gigachat_result.verdict != "spam":
         return SpamModerationResult(
             score=score_result.score,
             matched_rules=score_result.matched_rules,
-            gemini_checked=True,
-            gemini_verdict=gemini_result.verdict,
-            gemini_reason=gemini_result.reason,
+            ai_checked=True,
+            ai_verdict=gigachat_result.verdict,
+            ai_reason=gigachat_result.reason,
         )
 
     await _ban_user_for_spam(
         message=message,
         score=score_result.score,
         matched_rules=score_result.matched_rules,
-        reason=gemini_result.reason or "gemini_spam_verdict",
+        reason=gigachat_result.reason or "gigachat_spam_verdict",
     )
 
     return SpamModerationResult(
         action="banned",
         score=score_result.score,
         matched_rules=score_result.matched_rules,
-        gemini_checked=True,
-        gemini_verdict=gemini_result.verdict,
-        gemini_reason=gemini_result.reason,
+        ai_checked=True,
+        ai_verdict=gigachat_result.verdict,
+        ai_reason=gigachat_result.reason,
     )
 
 

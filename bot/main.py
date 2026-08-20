@@ -28,13 +28,14 @@ async def main() -> None:
     logger.info(
         "Starting bot allowed_chat_id=%s verification_timeout_seconds=%s "
         "join_verification_enabled=%s first_message_verification_enabled=%s "
-        "gemini_spam_moderation_enabled=%s "
+        "gigachat_spam_moderation_enabled=%s gigachat_model=%s "
         "message_moderation_mode=%s",
         config.allowed_chat_id,
         config.verification_timeout_seconds,
         config.join_verification_enabled,
         config.first_message_verification_enabled,
-        config.gemini_spam_moderation_enabled,
+        config.gigachat_spam_moderation_enabled,
+        config.gigachat_model,
         config.message_moderation_mode,
     )
 

@@ -26,26 +26,27 @@ class Config:
     verification_timeout_seconds: int
     join_verification_enabled: bool
     first_message_verification_enabled: bool
-    gemini_spam_moderation_enabled: bool
-    gemini_api_key: str | None
-    gemini_model: str
+    gigachat_spam_moderation_enabled: bool
+    gigachat_auth_key: str | None
+    gigachat_model: str
+    gigachat_scope: str
     spam_score_threshold: int
-    gemini_daily_request_limit: int
-    gemini_request_timeout_seconds: int
+    gigachat_request_timeout_seconds: int
+    gigachat_verify_ssl: bool
 
     @property
     def message_moderation_mode(self) -> str:
         if (
             self.first_message_verification_enabled
-            and self.gemini_spam_moderation_enabled
+            and self.gigachat_spam_moderation_enabled
         ):
             return "double_verification"
 
         if self.first_message_verification_enabled:
             return "verification_only"
 
-        if self.gemini_spam_moderation_enabled:
-            return "gemini_only"
+        if self.gigachat_spam_moderation_enabled:
+            return "gigachat_only"
 
         return "messages_checks_disabled"
 
@@ -65,22 +66,23 @@ config = Config(
         os.getenv("FIRST_MESSAGE_VERIFICATION_ENABLED"),
         default=True,
     ),
-    gemini_spam_moderation_enabled=_to_bool(
-        os.getenv("GEMINI_SPAM_MODERATION_ENABLED"),
+    gigachat_spam_moderation_enabled=_to_bool(
+        os.getenv("GIGACHAT_SPAM_MODERATION_ENABLED"),
         default=False,
     ),
-    gemini_api_key=os.getenv("GEMINI_API_KEY") or None,
-    gemini_model=os.getenv("GEMINI_MODEL") or "gemini-2.5-flash-lite",
+    gigachat_auth_key=os.getenv("GIGACHAT_AUTH_KEY") or None,
+    gigachat_model=os.getenv("GIGACHAT_MODEL") or "GigaChat-2",
+    gigachat_scope=os.getenv("GIGACHAT_SCOPE") or "GIGACHAT_API_PERS",
     spam_score_threshold=_to_int(
         os.getenv("SPAM_SCORE_THRESHOLD"),
         default=4,
     ),
-    gemini_daily_request_limit=_to_int(
-        os.getenv("GEMINI_DAILY_REQUEST_LIMIT"),
+    gigachat_request_timeout_seconds=_to_int(
+        os.getenv("GIGACHAT_REQUEST_TIMEOUT_SECONDS"),
         default=20,
     ),
-    gemini_request_timeout_seconds=_to_int(
-        os.getenv("GEMINI_REQUEST_TIMEOUT_SECONDS"),
-        default=15,
+    gigachat_verify_ssl=_to_bool(
+        os.getenv("GIGACHAT_VERIFY_SSL"),
+        default=True,
     ),
 )
