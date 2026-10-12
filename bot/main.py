@@ -44,8 +44,11 @@ async def main() -> None:
 
     bot = Bot(token=config.telegram_token)
     dp = Dispatcher()
-    dp.message.outer_middleware(MessageAuditMiddleware())
-    logger.info("Enabled middlewares: message_audit")
+    dp.message.outer_middleware(MessageAuditMiddleware(update_type="message"))
+    dp.edited_message.outer_middleware(
+        MessageAuditMiddleware(update_type="edited_message")
+    )
+    logger.info("Enabled middlewares: message_audit, edited_message_audit")
 
     dp.include_router(start_router)
     dp.include_router(access_router)

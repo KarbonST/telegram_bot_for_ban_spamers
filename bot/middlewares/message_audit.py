@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 class MessageAuditMiddleware(BaseMiddleware):
+    def __init__(self, *, update_type: str) -> None:
+        self.update_type = update_type
+
     async def __call__(
         self,
         handler: Callable[[Message, dict[str, Any]], Awaitable[Any]],
@@ -49,12 +52,15 @@ class MessageAuditMiddleware(BaseMiddleware):
                     pending_status = "lookup_failed"
 
             logger.info(
-                "Message audit chat=%s message_id=%s date=%s content_type=%s "
+                "Message audit update_type=%s chat=%s message_id=%s date=%s "
+                "edit_date=%s content_type=%s "
                 "from_user=%s sender_chat=%s verified=%s pending_verification=%s "
                 "automatic_forward=%s new_chat_members=%s text=%r",
+                self.update_type,
                 chat_repr(event.chat),
                 event.message_id,
                 event.date.isoformat(),
+                event.edit_date.isoformat() if event.edit_date else None,
                 event.content_type,
                 user_repr(event.from_user) if event.from_user else "<no-user>",
                 chat_repr(event.sender_chat) if event.sender_chat else "<no-sender-chat>",
